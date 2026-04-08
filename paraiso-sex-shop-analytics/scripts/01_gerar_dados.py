@@ -35,7 +35,7 @@ fake = Faker('pt_BR')
 Faker.seed(42)
 
 # Define o total de linhas que queremos gerar
-TOTAL_LINHAS = 5500
+TOTAL_LINHAS = 30000
 
 print("=" * 60)
 print("  PARAISO SEX SHOP — Geração de Dados")
@@ -140,7 +140,7 @@ pesos_categorias = [catalogo[c]["peso_vendas"] for c in categorias]
 # ── Configurações de clientes e regiões ─────────────────────────────────────
 
 # 800 clientes únicos → gera recorrência realista
-NUM_CLIENTES = 800
+NUM_CLIENTES = 3000
 
 # Informações fictícias de cada cliente (geradas uma vez e reutilizadas)
 clientes = []
@@ -204,8 +204,8 @@ def peso_sazonalidade(data_venda: date) -> float:
 # ── Geração das transações ───────────────────────────────────────────────────
 
 # Data de início e fim do período de vendas
-data_inicio = date(2023, 1, 1)
-data_fim    = date(2024, 12, 31)
+data_inicio = date(2015, 1, 1)
+data_fim    = date(2026, 12, 31)
 total_dias  = (data_fim - data_inicio).days
 
 transacoes = []  # lista onde vamos guardar cada transação

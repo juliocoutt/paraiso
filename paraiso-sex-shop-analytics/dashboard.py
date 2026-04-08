@@ -1,499 +1,547 @@
 # =============================================================================
-# PARAISO SEX SHOP — DASHBOARD INTERATIVO (STREAMLIT)
-# =============================================================================
-# Como rodar:
-#   venv\Scripts\streamlit run dashboard.py
-# Abrirá automaticamente no navegador em http://localhost:8501
+# PARAISO SEX SHOP — DASHBOARD PROFISSIONAL
+# Como rodar: venv\Scripts\streamlit run dashboard.py
 # =============================================================================
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+import base64, pathlib
 
-# ── Configuração da página ────────────────────────────────────────────────────
+# ── Configuração ──────────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="Paraiso Sex Shop — Analytics",
-    page_icon="💜",
+    page_title="Paraiso Sex Shop · Analytics",
+    page_icon="🖤",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# Estilo customizado
+# ── CSS limpo e profissional ──────────────────────────────────────────────────
+
 st.markdown("""
 <style>
-    .main { background-color: #0f0f1a; }
-    .metric-card {
-        background: linear-gradient(135deg, #1a1a2e, #16213e);
-        border: 1px solid #9B59B6;
-        border-radius: 12px;
-        padding: 20px;
-        text-align: center;
+    /* Remove padding padrão */
+    .block-container { padding: 2rem 2.5rem 2rem 2.5rem; }
+
+    /* Tipografia */
+    html, body, [class*="css"] { font-family: 'Inter', 'Segoe UI', sans-serif; }
+
+    /* Cards de métrica */
+    [data-testid="stMetric"] {
+        background-color: #F9F9F9;
+        border-left: 3px solid #C0392B;
+        border-radius: 4px;
+        padding: 20px 24px;
     }
-    .stMetric { background-color: #16213e; border-radius: 10px; padding: 10px; }
+    [data-testid="stMetricValue"] {
+        font-size: 1.9rem !important;
+        font-weight: 700 !important;
+        color: #111111 !important;
+    }
+    [data-testid="stMetricLabel"] {
+        font-size: 0.78rem !important;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #666666 !important;
+    }
+
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background-color: #F5F5F5;
+        border-right: 1px solid #E0E0E0;
+    }
+
+    /* Divisor */
+    hr { border-color: #E0E0E0; }
+
+    /* Título de seção */
+    .section-title {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #666666;
+        margin-bottom: 1rem;
+        margin-top: 1.8rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-CORES = ["#9B59B6", "#E91E8C", "#F39C12", "#1ABC9C", "#3498DB", "#E74C3C"]
+# Paleta profissional: vermelho escuro + neutros
+COR_PRIMARIA  = "#C0392B"
+COR_HOVER     = "#E74C3C"
+PAPEL         = "#FFFFFF"
+PLOT_BG       = "#FAFAFA"
+GRADE         = "#EEEEEE"
+TEXTO         = "#111111"
 
-# ── Carrega dados ─────────────────────────────────────────────────────────────
+PALETA = [COR_PRIMARIA, "#E74C3C", "#922B21", "#7B241C", "#F1948A", "#FADBD8"]
+
+def layout_base():
+    return dict(
+        template="plotly_white",
+        paper_bgcolor=PAPEL,
+        plot_bgcolor=PLOT_BG,
+        font=dict(family="Inter, Segoe UI, sans-serif", color=TEXTO, size=12),
+        margin=dict(l=16, r=16, t=40, b=16),
+        xaxis=dict(showgrid=True, gridcolor=GRADE, zeroline=False),
+        yaxis=dict(showgrid=True, gridcolor=GRADE, zeroline=False),
+        legend=dict(bgcolor="rgba(0,0,0,0)", bordercolor="rgba(0,0,0,0)", font=dict(size=11)),
+    )
+
+# ── Dados ─────────────────────────────────────────────────────────────────────
 
 @st.cache_data
-def carregar_dados():
-    df = pd.read_csv("data/ecom_data_clean.csv", encoding="utf-8-sig", parse_dates=["Data_Venda"])
+def carregar():
+    df  = pd.read_csv("data/ecom_data_clean.csv", encoding="utf-8-sig", parse_dates=["Data_Venda"])
     rfm = pd.read_csv("data/rfm_clientes.csv", encoding="utf-8-sig")
     return df, rfm
 
-df, rfm = carregar_dados()
+df, rfm = carregar()
 
-# ── Sidebar — Filtros ─────────────────────────────────────────────────────────
+# ── Mapa do Brasil (cache global) ─────────────────────────────────────────────
+import json as _json, os as _os
 
-st.sidebar.image("https://img.icons8.com/color/96/000000/heart-with-pulse.png", width=60)
-st.sidebar.title("Paraiso Sex Shop")
-st.sidebar.markdown("**Dashboard Analítico**")
-st.sidebar.markdown("---")
+@st.cache_data(show_spinner=False)
+def get_geojson():
+    # tenta encontrar o arquivo em múltiplos locais possíveis
+    from pathlib import Path
+    candidatos = [
+        Path(__file__).parent / "dashboard" / "brazil-states.geojson",
+        Path.cwd() / "dashboard" / "brazil-states.geojson",
+        Path.cwd() / "brazil-states.geojson",
+    ]
+    for p in candidatos:
+        if p.exists():
+            with open(p, "r", encoding="utf-8") as f:
+                return _json.load(f)
+    raise FileNotFoundError(f"GeoJSON nao encontrado. Tentados: {candidatos}")
 
-anos = sorted(df["Ano"].unique())
-regioes = sorted(df["Regiao"].unique())
-categorias = sorted(df["Categoria_Produto"].unique())
+ESTADO_REGIAO = {
+    "AC":"Norte","AM":"Norte","AP":"Norte","PA":"Norte","RO":"Norte","RR":"Norte","TO":"Norte",
+    "AL":"Nordeste","BA":"Nordeste","CE":"Nordeste","MA":"Nordeste","PB":"Nordeste",
+    "PE":"Nordeste","PI":"Nordeste","RN":"Nordeste","SE":"Nordeste",
+    "DF":"Centro-Oeste","GO":"Centro-Oeste","MS":"Centro-Oeste","MT":"Centro-Oeste",
+    "ES":"Sudeste","MG":"Sudeste","RJ":"Sudeste","SP":"Sudeste",
+    "PR":"Sul","RS":"Sul","SC":"Sul",
+}
 
-ano_sel = st.sidebar.multiselect("Ano", anos, default=anos)
-regiao_sel = st.sidebar.multiselect("Região", regioes, default=regioes)
-cat_sel = st.sidebar.multiselect("Categoria", categorias, default=categorias)
+# ── Sidebar ───────────────────────────────────────────────────────────────────
 
-# Aplica filtros
-mask = (
-    df["Ano"].isin(ano_sel) &
-    df["Regiao"].isin(regiao_sel) &
-    df["Categoria_Produto"].isin(cat_sel)
-)
-df_f = df[mask]
+with st.sidebar:
+    # Logo centralizada
+    logo_path = pathlib.Path("dashboard/logo.png")
+    if logo_path.exists():
+        b64 = base64.b64encode(logo_path.read_bytes()).decode()
+        st.markdown(
+            f"<div style='text-align:center;padding:24px 0 8px'>"
+            f"<img src='data:image/png;base64,{b64}' width='100'/></div>",
+            unsafe_allow_html=True
+        )
+    st.markdown(
+        "<div style='text-align:center'>"
+        "<span style='font-size:1.1rem;font-weight:700;color:#C0392B'>Paraiso Sex Shop</span><br>"
+        "<span style='font-size:0.72rem;color:#999;letter-spacing:0.1em;text-transform:uppercase'>Analytics</span>"
+        "</div>",
+        unsafe_allow_html=True
+    )
+    st.markdown("<hr style='margin:20px 0'>", unsafe_allow_html=True)
 
-st.sidebar.markdown("---")
-st.sidebar.markdown(f"**Registros filtrados:** {len(df_f):,}")
+    # Filtros
+    st.markdown("<p class='section-title'>Filtros</p>", unsafe_allow_html=True)
+    anos     = sorted(df["Ano"].unique(), reverse=True)
+    regioes  = sorted(df["Regiao"].unique())
+    cats     = sorted(df["Categoria_Produto"].unique())
 
-# ── Navegação entre páginas ───────────────────────────────────────────────────
+    meses_nomes = {1:"Janeiro",2:"Fevereiro",3:"Março",4:"Abril",5:"Maio",6:"Junho",
+                   7:"Julho",8:"Agosto",9:"Setembro",10:"Outubro",11:"Novembro",12:"Dezembro"}
+    meses_nums  = sorted(df["Mes"].unique())
+    meses_opts  = [meses_nomes[m] for m in meses_nums]
 
-pagina = st.sidebar.radio(
-    "Navegar para",
-    ["📊 Visão Geral", "👥 Clientes", "🛍️ Produtos", "🔮 Previsão"]
-)
+    ano_sel    = st.multiselect("Ano",       anos,       default=None, placeholder="Todos os anos")
+    mes_sel    = st.multiselect("Mês",       meses_opts, default=None, placeholder="Todos os meses")
+    regiao_sel = st.multiselect("Região",    regioes,    default=None, placeholder="Todas as regiões")
+    cat_sel    = st.multiselect("Categoria", cats,       default=None, placeholder="Todas as categorias")
+
+    # Se nada selecionado → mostra tudo
+    if not ano_sel:    ano_sel    = anos
+    if not mes_sel:    mes_nums_sel = meses_nums
+    else:              mes_nums_sel = [k for k,v in meses_nomes.items() if v in mes_sel]
+    if not regiao_sel: regiao_sel = regioes
+    if not cat_sel:    cat_sel    = cats
+
+    st.markdown("<hr style='margin:20px 0'>", unsafe_allow_html=True)
+
+    # Navegação
+    st.markdown("<p class='section-title'>Navegação</p>", unsafe_allow_html=True)
+    pagina = st.radio("", ["Visão Geral", "Clientes", "Produtos", "Previsão"],
+                      label_visibility="collapsed")
+
+    st.markdown("<hr style='margin:20px 0'>", unsafe_allow_html=True)
+    mask   = (df["Ano"].isin(ano_sel) & df["Mes"].isin(mes_nums_sel) &
+              df["Regiao"].isin(regiao_sel) & df["Categoria_Produto"].isin(cat_sel))
+    df_f   = df[mask]
+    st.caption(f"{len(df_f):,} registros · {df_f['ID_Cliente'].nunique()} clientes")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PÁGINA 1 — VISÃO GERAL
+# VISÃO GERAL
 # ══════════════════════════════════════════════════════════════════════════════
 
-if pagina == "📊 Visão Geral":
+if pagina == "Visão Geral":
 
-    st.title("📊 Visão Geral — Paraiso Sex Shop")
-    st.markdown("Período: **Jan/2023 – Dez/2024** | Fonte: Dataset simulado InsightFlow")
+    data_ini = df["Data_Venda"].min().strftime("%b/%Y")
+    data_fim = df["Data_Venda"].max().strftime("%b/%Y")
+    st.markdown(f"""
+<div style='text-align:center; padding: 32px 0 24px 0'>
+    <h1 style='font-size:2.4rem; font-weight:800; margin-bottom:8px; color:#111'>
+        Paraiso Sex Shop
+    </h1>
+    <p style='font-size:1rem; color:#C0392B; font-weight:600; margin:0; letter-spacing:0.05em'>
+        DASHBOARD ANALÍTICO DE VENDAS
+    </p>
+    <p style='font-size:0.85rem; color:#888; margin-top:8px'>
+        Análise completa do período <strong>{data_ini}</strong> a <strong>{data_fim}</strong>
+        &nbsp;·&nbsp; {len(df_f):,} transações &nbsp;·&nbsp; {df_f["ID_Cliente"].nunique():,} clientes únicos
+    </p>
+</div>
+""", unsafe_allow_html=True)
     st.markdown("---")
 
     # KPIs
-    col1, col2, col3, col4 = st.columns(4)
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Faturamento",     f"R$ {df_f['Valor_Total'].sum():,.0f}")
+    c2.metric("Ticket Médio",    f"R$ {df_f['Valor_Total'].mean():,.2f}")
+    c3.metric("Pedidos",         f"{len(df_f):,}")
+    c4.metric("Clientes Únicos", f"{df_f['ID_Cliente'].nunique():,}")
 
-    faturamento = df_f["Valor_Total"].sum()
-    ticket_medio = df_f["Valor_Total"].mean()
-    total_pedidos = len(df_f)
-    clientes_unicos = df_f["ID_Cliente"].nunique()
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    col1.metric("💰 Faturamento Total", f"R$ {faturamento:,.0f}")
-    col2.metric("🎯 Ticket Médio",       f"R$ {ticket_medio:,.2f}")
-    col3.metric("📦 Total de Pedidos",   f"{total_pedidos:,}")
-    col4.metric("👤 Clientes Únicos",    f"{clientes_unicos:,}")
+    # Faturamento mensal
+    fat = df_f.groupby("AnoMes")["Valor_Total"].sum().reset_index().sort_values("AnoMes")
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=fat["AnoMes"], y=fat["Valor_Total"],
+        mode="lines+markers",
+        line=dict(color=COR_PRIMARIA, width=2),
+        marker=dict(size=4, color=COR_PRIMARIA),
+        fill="tozeroy",
+        fillcolor=f"rgba(192,57,43,0.08)",
+        name="Faturamento",
+        hovertemplate="<b>%{x}</b><br>R$ %{y:,.0f}<extra></extra>",
+    ))
+    fig.update_layout(**layout_base(), title="Faturamento Mensal", height=300,
+                      xaxis_tickangle=-40)
+    st.plotly_chart(fig, width="stretch")
 
-    st.markdown("---")
-
-    # Gráfico de linha — Faturamento mensal
-    fat_mensal = (
-        df_f.groupby("AnoMes")["Valor_Total"]
-        .sum()
-        .reset_index()
-        .sort_values("AnoMes")
-    )
-
-    fig_linha = px.line(
-        fat_mensal,
-        x="AnoMes",
-        y="Valor_Total",
-        title="Faturamento Mensal",
-        markers=True,
-        color_discrete_sequence=[CORES[1]],
-        labels={"AnoMes": "Mês", "Valor_Total": "Receita (R$)"},
-    )
-    fig_linha.update_layout(
-        template="plotly_dark",
-        plot_bgcolor="#16213e",
-        paper_bgcolor="#1a1a2e",
-        height=380,
-        xaxis_tickangle=-45,
-    )
-    fig_linha.update_traces(fill="tozeroy", fillcolor="rgba(233,30,140,0.1)")
-    st.plotly_chart(fig_linha, use_container_width=True)
-
-    # Linha 2 — Categoria + Método de pagamento
+    st.markdown("<br>", unsafe_allow_html=True)
     col_a, col_b = st.columns(2)
 
     with col_a:
-        fat_cat = df_f.groupby("Categoria_Produto")["Valor_Total"].sum().reset_index().sort_values("Valor_Total", ascending=False)
-        fig_cat = px.bar(
-            fat_cat,
-            x="Categoria_Produto",
-            y="Valor_Total",
-            title="Receita por Categoria",
-            color="Categoria_Produto",
-            color_discrete_sequence=CORES,
-            labels={"Valor_Total": "Receita (R$)", "Categoria_Produto": ""},
-        )
-        fig_cat.update_layout(template="plotly_dark", paper_bgcolor="#1a1a2e", plot_bgcolor="#16213e", showlegend=False, height=340)
-        st.plotly_chart(fig_cat, use_container_width=True)
+        cat = df_f.groupby("Categoria_Produto")["Valor_Total"].sum().reset_index().sort_values("Valor_Total")
+        fig2 = go.Figure(go.Bar(
+            x=cat["Valor_Total"], y=cat["Categoria_Produto"],
+            orientation="h",
+            marker=dict(color=COR_PRIMARIA, opacity=0.85),
+            hovertemplate="<b>%{y}</b><br>R$ %{x:,.0f}<extra></extra>",
+        ))
+        fig2.update_layout(**layout_base(), title="Receita por Categoria", height=300)
+        st.plotly_chart(fig2, width="stretch")
 
     with col_b:
         pag = df_f.groupby("Metodo_Pagamento")["Valor_Total"].sum().reset_index()
-        fig_pag = px.pie(
-            pag,
-            names="Metodo_Pagamento",
-            values="Valor_Total",
-            title="Receita por Método de Pagamento",
-            color_discrete_sequence=CORES,
-            hole=0.4,
+        fig3 = go.Figure(go.Pie(
+            labels=pag["Metodo_Pagamento"], values=pag["Valor_Total"],
+            hole=0.6,
+            marker=dict(colors=PALETA),
+            textinfo="percent",
+            hovertemplate="<b>%{label}</b><br>R$ %{value:,.0f}<extra></extra>",
+        ))
+        lo = layout_base()
+        lo["legend"].update(orientation="v", x=1, y=0.5)
+        fig3.update_layout(**lo, title="Método de Pagamento", height=300, showlegend=True)
+        st.plotly_chart(fig3, width="stretch")
+
+    # ── Mapa de Calor — 5 Regiões do Brasil ──────────────────────────────────
+    st.markdown("<br>", unsafe_allow_html=True)
+    receita_regiao = df_f.groupby("Regiao")["Valor_Total"].sum().to_dict()
+    df_estados = pd.DataFrame([
+        {"Estado": uf, "Regiao": reg,
+         "Receita": receita_regiao.get(reg, 0),
+         "Receita_fmt": f"R$ {receita_regiao.get(reg, 0):,.0f}"}
+        for uf, reg in ESTADO_REGIAO.items()
+    ])
+
+    try:
+        geojson = get_geojson()
+        fig_mapa = px.choropleth(
+            df_estados,
+            geojson=geojson,
+            locations="Estado",
+            featureidkey="properties.sigla",
+            color="Receita",
+            color_continuous_scale=["#FFF0F0", "#F1948A", COR_PRIMARIA, "#7B241C"],
+            custom_data=["Regiao", "Receita_fmt"],
+            title="Receita por Região do Brasil",
         )
-        fig_pag.update_layout(template="plotly_dark", paper_bgcolor="#1a1a2e", height=340)
-        st.plotly_chart(fig_pag, use_container_width=True)
-
-    # Canal de venda
-    col_c, col_d = st.columns(2)
-
-    with col_c:
-        canal = df_f.groupby("Canal_Venda")["Valor_Total"].sum().reset_index()
-        fig_canal = px.bar(
-            canal,
-            x="Canal_Venda",
-            y="Valor_Total",
-            title="Receita por Canal de Venda",
-            color="Canal_Venda",
-            color_discrete_sequence=CORES,
-            labels={"Valor_Total": "Receita (R$)", "Canal_Venda": ""},
+        fig_mapa.update_traces(
+            hovertemplate="<b>%{customdata[0]}</b><br>%{customdata[1]}<extra></extra>"
         )
-        fig_canal.update_layout(template="plotly_dark", paper_bgcolor="#1a1a2e", plot_bgcolor="#16213e", showlegend=False, height=300)
-        st.plotly_chart(fig_canal, use_container_width=True)
-
-    with col_d:
-        status = df_f.groupby("Status_Pedido")["Valor_Total"].sum().reset_index()
-        fig_status = px.pie(
-            status,
-            names="Status_Pedido",
-            values="Valor_Total",
-            title="Status dos Pedidos",
-            color_discrete_sequence=CORES,
-            hole=0.4,
+        fig_mapa.update_geos(fitbounds="locations", visible=False, bgcolor="rgba(0,0,0,0)")
+        fig_mapa.update_layout(
+            **layout_base(),
+            height=520,
+            margin=dict(l=0, r=0, t=40, b=0),
+            coloraxis_colorbar=dict(
+                title="Receita (R$)",
+                tickformat=",.0f",
+                len=0.7, thickness=14,
+            ),
         )
-        fig_status.update_layout(template="plotly_dark", paper_bgcolor="#1a1a2e", height=300)
-        st.plotly_chart(fig_status, use_container_width=True)
-
+        st.plotly_chart(fig_mapa, width="stretch")
+    except Exception as _e:
+        st.error(f"Erro no mapa: {_e}")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PÁGINA 2 — CLIENTES
+# CLIENTES
 # ══════════════════════════════════════════════════════════════════════════════
 
-elif pagina == "👥 Clientes":
+elif pagina == "Clientes":
 
-    st.title("👥 Análise de Clientes")
+    st.markdown("## Clientes")
+    st.caption("Perfil, segmentação RFM e análise regional")
     st.markdown("---")
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("👤 Clientes Únicos",       f"{df_f['ID_Cliente'].nunique():,}")
-    col2.metric("🔁 Pedidos por Cliente",    f"{len(df_f)/max(df_f['ID_Cliente'].nunique(),1):.1f}")
-    col3.metric("💰 LTV Médio",              f"R$ {df_f.groupby('ID_Cliente')['Valor_Total'].sum().mean():,.2f}")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Clientes Únicos",    f"{df_f['ID_Cliente'].nunique():,}")
+    c2.metric("Pedidos / Cliente",  f"{len(df_f)/max(df_f['ID_Cliente'].nunique(),1):.1f}")
+    c3.metric("LTV Médio",          f"R$ {df_f.groupby('ID_Cliente')['Valor_Total'].sum().mean():,.2f}")
 
-    st.markdown("---")
-
+    st.markdown("<br>", unsafe_allow_html=True)
     col_a, col_b = st.columns(2)
 
     with col_a:
-        fat_faixa = df_f.groupby("Faixa_Etaria")["Valor_Total"].sum().reset_index().sort_values("Valor_Total", ascending=False)
-        fig_faixa = px.bar(
-            fat_faixa,
-            x="Faixa_Etaria",
-            y="Valor_Total",
-            title="Receita por Faixa Etária",
-            color="Faixa_Etaria",
-            color_discrete_sequence=CORES,
-            labels={"Valor_Total": "Receita (R$)", "Faixa_Etaria": ""},
-        )
-        fig_faixa.update_layout(template="plotly_dark", paper_bgcolor="#1a1a2e", plot_bgcolor="#16213e", showlegend=False, height=340)
-        st.plotly_chart(fig_faixa, use_container_width=True)
+        fe = df_f.groupby("Faixa_Etaria")["Valor_Total"].sum().reset_index().sort_values("Valor_Total", ascending=True)
+        fig = go.Figure(go.Bar(
+            x=fe["Valor_Total"], y=fe["Faixa_Etaria"],
+            orientation="h",
+            marker=dict(color=COR_PRIMARIA, opacity=0.85),
+            hovertemplate="<b>%{y}</b><br>R$ %{x:,.0f}<extra></extra>",
+        ))
+        fig.update_layout(**layout_base(), title="Receita por Faixa Etária", height=280)
+        st.plotly_chart(fig, width="stretch")
 
     with col_b:
-        fat_genero = df_f.groupby("Genero_Cliente")["Valor_Total"].sum().reset_index()
-        fig_genero = px.pie(
-            fat_genero,
-            names="Genero_Cliente",
-            values="Valor_Total",
-            title="Receita por Gênero",
-            color_discrete_sequence=CORES,
-            hole=0.4,
-        )
-        fig_genero.update_layout(template="plotly_dark", paper_bgcolor="#1a1a2e", height=340)
-        st.plotly_chart(fig_genero, use_container_width=True)
+        ge = df_f.groupby("Genero_Cliente")["Valor_Total"].sum().reset_index()
+        fig2 = go.Figure(go.Pie(
+            labels=ge["Genero_Cliente"], values=ge["Valor_Total"],
+            hole=0.6, marker=dict(colors=PALETA),
+            textinfo="percent",
+            hovertemplate="<b>%{label}</b><br>R$ %{value:,.0f}<extra></extra>",
+        ))
+        fig2.update_layout(**layout_base(), title="Receita por Gênero", height=280)
+        st.plotly_chart(fig2, width="stretch")
 
-    # Receita por região
-    fat_regiao = df_f.groupby("Regiao")["Valor_Total"].sum().reset_index().sort_values("Valor_Total", ascending=True)
-    fig_regiao = px.bar(
-        fat_regiao,
-        x="Valor_Total",
-        y="Regiao",
-        title="Receita por Região do Brasil",
+    # Região
+    reg = df_f.groupby("Regiao")["Valor_Total"].sum().reset_index().sort_values("Valor_Total", ascending=True)
+    fig3 = go.Figure(go.Bar(
+        x=reg["Valor_Total"], y=reg["Regiao"],
         orientation="h",
-        color="Valor_Total",
-        color_continuous_scale=["#9B59B6", "#E91E8C"],
-        labels={"Valor_Total": "Receita (R$)", "Regiao": ""},
-    )
-    fig_regiao.update_layout(template="plotly_dark", paper_bgcolor="#1a1a2e", plot_bgcolor="#16213e", height=320, coloraxis_showscale=False)
-    st.plotly_chart(fig_regiao, use_container_width=True)
+        marker=dict(
+            color=reg["Valor_Total"],
+            colorscale=[[0, "#FFE0E0"], [1, COR_PRIMARIA]],
+            showscale=False,
+        ),
+        hovertemplate="<b>%{y}</b><br>R$ %{x:,.0f}<extra></extra>",
+    ))
+    fig3.update_layout(**layout_base(), title="Receita por Região", height=260)
+    st.plotly_chart(fig3, width="stretch")
 
-    # Segmentação RFM
-    st.subheader("🎯 Segmentação RFM dos Clientes")
-
-    col_r1, col_r2 = st.columns(2)
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("#### Segmentação RFM")
+    col_r1, col_r2 = st.columns([1, 1])
 
     with col_r1:
-        seg_count = rfm["Segmento"].value_counts().reset_index()
-        seg_count.columns = ["Segmento", "Clientes"]
-        fig_rfm = px.bar(
-            seg_count,
-            x="Segmento",
-            y="Clientes",
-            title="Clientes por Segmento RFM",
-            color="Segmento",
-            color_discrete_sequence=CORES,
-        )
-        fig_rfm.update_layout(template="plotly_dark", paper_bgcolor="#1a1a2e", plot_bgcolor="#16213e", showlegend=False, height=340)
-        st.plotly_chart(fig_rfm, use_container_width=True)
+        sc = rfm["Segmento"].value_counts().reset_index()
+        sc.columns = ["Segmento", "Clientes"]
+        fig4 = go.Figure(go.Bar(
+            x=sc["Segmento"], y=sc["Clientes"],
+            marker=dict(color=PALETA[:len(sc)]),
+            hovertemplate="<b>%{x}</b><br>%{y} clientes<extra></extra>",
+        ))
+        fig4.update_layout(**layout_base(), title="Clientes por Segmento", height=280, showlegend=False)
+        st.plotly_chart(fig4, width="stretch")
 
     with col_r2:
-        st.markdown("**Descrição dos Segmentos**")
-        descricoes = {
-            "Champion":  "Comprou recente, frequente e gasta muito. Ofereça acesso VIP.",
-            "Loyal":     "Cliente fiel. Estimule cross-sell entre categorias.",
-            "Promising": "Recente mas ainda pouco frequente. Nutrir com conteúdo.",
-            "At Risk":   "Já foi bom cliente mas sumiu. Campanha de reativação urgente.",
-            "Lost":      "Inativo há muito tempo. Oferta agressiva ou aceitar churn.",
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        info = {
+            "Champion":  ("🔴", "Recente, frequente, alto valor — fidelizar com VIP"),
+            "Loyal":     ("🟠", "Fiel — estimular cross-sell entre categorias"),
+            "Promising": ("🟡", "Recente, pouca frequência — nutrir com ofertas"),
+            "At Risk":   ("⚪", "Sumiu — campanha de reativação urgente"),
+            "Lost":      ("⬛", "Inativo — oferta agressiva ou aceitar churn"),
         }
-        for seg, desc in descricoes.items():
-            cor = {"Champion": "🟣", "Loyal": "🟡", "Promising": "🟢", "At Risk": "🟠", "Lost": "🔴"}.get(seg, "⚪")
-            qtd = len(rfm[rfm["Segmento"] == seg])
-            st.markdown(f"{cor} **{seg}** ({qtd} clientes): {desc}")
-
-    # Top 10 clientes
-    st.subheader("🏆 Top 10 Clientes por Receita")
-    top10 = (
-        df_f.groupby(["ID_Cliente", "Nome_Cliente", "Regiao"])
-        .agg(Receita=("Valor_Total", "sum"), Pedidos=("ID_Transacao", "count"))
-        .reset_index()
-        .sort_values("Receita", ascending=False)
-        .head(10)
-    )
-    top10["Receita"] = top10["Receita"].apply(lambda x: f"R$ {x:,.2f}")
-    st.dataframe(top10, use_container_width=True, hide_index=True)
-
+        for seg, (ico, desc) in info.items():
+            n = len(rfm[rfm["Segmento"] == seg])
+            st.markdown(f"{ico} &nbsp; **{seg}** &nbsp; <span style='color:#666'>({n})</span> &nbsp; {desc}",
+                        unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PÁGINA 3 — PRODUTOS
+# PRODUTOS
 # ══════════════════════════════════════════════════════════════════════════════
 
-elif pagina == "🛍️ Produtos":
+elif pagina == "Produtos":
 
-    st.title("🛍️ Análise de Produtos")
+    st.markdown("## Produtos")
+    st.caption("Performance por produto e categoria")
     st.markdown("---")
 
-    # Top 10 produtos
-    top10_prod = (
-        df_f.groupby("Nome_Produto")["Valor_Total"]
-        .sum()
-        .sort_values(ascending=True)
-        .tail(10)
-        .reset_index()
-    )
-    fig_top10 = px.bar(
-        top10_prod,
-        x="Valor_Total",
-        y="Nome_Produto",
+    top10 = (df_f.groupby("Nome_Produto")["Valor_Total"].sum()
+               .sort_values(ascending=True).tail(10).reset_index())
+    fig = go.Figure(go.Bar(
+        x=top10["Valor_Total"], y=top10["Nome_Produto"],
         orientation="h",
-        title="Top 10 Produtos por Receita",
-        color="Valor_Total",
-        color_continuous_scale=["#9B59B6", "#E91E8C"],
-        labels={"Valor_Total": "Receita (R$)", "Nome_Produto": ""},
-    )
-    fig_top10.update_layout(template="plotly_dark", paper_bgcolor="#1a1a2e", plot_bgcolor="#16213e", height=420, coloraxis_showscale=False)
-    st.plotly_chart(fig_top10, use_container_width=True)
+        marker=dict(
+            color=top10["Valor_Total"],
+            colorscale=[[0, "#4a0a07"], [1, COR_PRIMARIA]],
+            showscale=False,
+        ),
+        hovertemplate="<b>%{y}</b><br>R$ %{x:,.0f}<extra></extra>",
+    ))
+    fig.update_layout(**layout_base(), title="Top 10 Produtos por Receita", height=360)
+    st.plotly_chart(fig, width="stretch")
 
     col_a, col_b = st.columns(2)
 
     with col_a:
-        # Treemap por categoria
-        fat_cat = df_f.groupby(["Categoria_Produto", "Nome_Produto"])["Valor_Total"].sum().reset_index()
-        fig_tree = px.treemap(
+        fat_cat = (df_f.groupby(["Categoria_Produto", "Nome_Produto"])["Valor_Total"]
+                   .sum().reset_index())
+        fig2 = px.treemap(
             fat_cat,
             path=["Categoria_Produto", "Nome_Produto"],
             values="Valor_Total",
-            title="Receita: Categoria → Produto",
             color="Valor_Total",
-            color_continuous_scale=["#1a1a2e", "#9B59B6", "#E91E8C"],
+            color_continuous_scale=["#FFEEEE", COR_PRIMARIA, COR_HOVER],
         )
-        fig_tree.update_layout(template="plotly_dark", paper_bgcolor="#1a1a2e", height=420)
-        st.plotly_chart(fig_tree, use_container_width=True)
+        fig2.update_layout(**layout_base(), title="Receita: Categoria → Produto", height=380,
+                           coloraxis_showscale=False)
+        fig2.update_traces(hovertemplate="<b>%{label}</b><br>R$ %{value:,.0f}<extra></extra>")
+        st.plotly_chart(fig2, width="stretch")
 
     with col_b:
-        # Dispersão: Desconto × Valor Total
-        amostra = df_f.sample(min(600, len(df_f)), random_state=42)
-        fig_disp = px.scatter(
-            amostra,
-            x="Desconto_Pct",
-            y="Valor_Total",
-            color="Categoria_Produto",
-            title="Desconto (%) × Valor Total",
-            opacity=0.5,
-            color_discrete_sequence=CORES,
-            labels={"Desconto_Pct": "Desconto (%)", "Valor_Total": "Valor Total (R$)"},
-        )
-        fig_disp.update_layout(template="plotly_dark", paper_bgcolor="#1a1a2e", plot_bgcolor="#16213e", height=420)
-        st.plotly_chart(fig_disp, use_container_width=True)
-
-    # Quantidade média por categoria
-    qtd_cat = df_f.groupby("Categoria_Produto")["Quantidade"].mean().reset_index().sort_values("Quantidade", ascending=False)
-    fig_qtd = px.bar(
-        qtd_cat,
-        x="Categoria_Produto",
-        y="Quantidade",
-        title="Quantidade Média por Pedido (por Categoria)",
-        color="Categoria_Produto",
-        color_discrete_sequence=CORES,
-        labels={"Quantidade": "Qtd Média", "Categoria_Produto": ""},
-    )
-    fig_qtd.update_layout(template="plotly_dark", paper_bgcolor="#1a1a2e", plot_bgcolor="#16213e", showlegend=False, height=320)
-    st.plotly_chart(fig_qtd, use_container_width=True)
-
+        am = df_f.sample(min(500, len(df_f)), random_state=42)
+        fig3 = go.Figure()
+        for i, cat in enumerate(df_f["Categoria_Produto"].unique()):
+            d = am[am["Categoria_Produto"] == cat]
+            fig3.add_trace(go.Scatter(
+                x=d["Desconto_Pct"], y=d["Valor_Total"],
+                mode="markers",
+                name=cat,
+                marker=dict(size=5, opacity=0.6, color=PALETA[i % len(PALETA)]),
+                hovertemplate=f"<b>{cat}</b><br>Desconto: %{{x}}%<br>Valor: R$ %{{y:,.0f}}<extra></extra>",
+            ))
+        fig3.update_layout(**layout_base(), title="Desconto × Valor Total", height=380)
+        st.plotly_chart(fig3, width="stretch")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PÁGINA 4 — PREVISÃO
+# PREVISÃO
 # ══════════════════════════════════════════════════════════════════════════════
 
-elif pagina == "🔮 Previsão":
+elif pagina == "Previsão":
 
-    st.title("🔮 Modelo Preditivo de Faturamento")
-    st.markdown("**Algoritmo:** Regressão Linear com variáveis de sazonalidade")
-    st.markdown("---")
-
-    import numpy as np
     from sklearn.linear_model import LinearRegression
     from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 
-    # Agrega faturamento mensal (sem filtros de região/categoria para a série completa)
-    fat_serie = (
-        df.groupby("AnoMes")["Valor_Total"]
-        .sum()
-        .reset_index()
-        .sort_values("AnoMes")
-    )
-    fat_serie["T"] = range(1, len(fat_serie) + 1)
-    fat_serie["Mes_Num"] = fat_serie["AnoMes"].str[-2:].astype(int)
-    fat_serie["Mes_Fev"] = (fat_serie["Mes_Num"] == 2).astype(int)
-    fat_serie["Mes_Jun"] = (fat_serie["Mes_Num"] == 6).astype(int)
-    fat_serie["Mes_Nov"] = (fat_serie["Mes_Num"] == 11).astype(int)
-    fat_serie["Mes_Dez"] = (fat_serie["Mes_Num"] == 12).astype(int)
+    # Calcula os 3 meses seguintes ao último mês do dataset
+    ultimo_mes  = pd.Period(df["AnoMes"].max(), freq="M")
+    prox_meses  = [(ultimo_mes + i) for i in range(1, 4)]
+    prox_labels = [str(p) for p in prox_meses]
+    prox_label_fmt = f"{prox_meses[0].strftime('%b/%Y')} – {prox_meses[2].strftime('%b/%Y')}"
 
-    features = ["T", "Mes_Fev", "Mes_Jun", "Mes_Nov", "Mes_Dez"]
-    X = fat_serie[features].values
-    y = fat_serie["Valor_Total"].values
-
-    modelo = LinearRegression().fit(X, y)
-    y_pred = modelo.predict(X)
-
-    r2   = r2_score(y, y_pred)
-    mae  = mean_absolute_error(y, y_pred)
-    rmse = np.sqrt(mean_squared_error(y, y_pred))
-    mape = np.mean(np.abs((y - y_pred) / y)) * 100
-
-    # Métricas
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("R² (Precisão)", f"{r2:.3f}", help="Quanto mais próximo de 1, melhor")
-    col2.metric("MAE", f"R$ {mae:,.0f}", help="Erro médio absoluto")
-    col3.metric("RMSE", f"R$ {rmse:,.0f}", help="Penaliza erros grandes")
-    col4.metric("MAPE", f"{mape:.1f}%", help="Erro percentual médio")
-
+    st.markdown("## Previsão de Faturamento")
+    st.caption(f"Regressão Linear com variáveis de sazonalidade · {prox_label_fmt}")
     st.markdown("---")
 
-    # Previsão Jan-Mar 2025
-    proximos = pd.DataFrame({
-        "AnoMes": ["2025-01", "2025-02", "2025-03"],
-        "T": [25, 26, 27],
-        "Mes_Fev": [0, 1, 0],
-        "Mes_Jun": [0, 0, 0],
-        "Mes_Nov": [0, 0, 0],
-        "Mes_Dez": [0, 0, 0],
+    fat_s = (df.groupby("AnoMes")["Valor_Total"].sum().reset_index().sort_values("AnoMes"))
+    fat_s["T"]       = range(1, len(fat_s) + 1)
+    fat_s["Mes_Num"] = fat_s["AnoMes"].str[-2:].astype(int)
+    fat_s["Mes_Fev"] = (fat_s["Mes_Num"] == 2).astype(int)
+    fat_s["Mes_Jun"] = (fat_s["Mes_Num"] == 6).astype(int)
+    fat_s["Mes_Nov"] = (fat_s["Mes_Num"] == 11).astype(int)
+    fat_s["Mes_Dez"] = (fat_s["Mes_Num"] == 12).astype(int)
+
+    feats = ["T", "Mes_Fev", "Mes_Jun", "Mes_Nov", "Mes_Dez"]
+    X, y  = fat_s[feats].values, fat_s["Valor_Total"].values
+    m     = LinearRegression().fit(X, y)
+    yp    = m.predict(X)
+
+    r2   = r2_score(y, yp)
+    mae  = mean_absolute_error(y, yp)
+    rmse = np.sqrt(mean_squared_error(y, yp))
+    mape = np.mean(np.abs((y - yp) / y)) * 100
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("R²",    f"{r2:.3f}",        help="Quanto mais próximo de 1, melhor")
+    c2.metric("MAE",   f"R$ {mae:,.0f}",   help="Erro médio absoluto")
+    c3.metric("RMSE",  f"R$ {rmse:,.0f}",  help="Penaliza erros grandes")
+    c4.metric("MAPE",  f"{mape:.1f}%",     help="Erro percentual médio")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    n_hist = len(fat_s)
+    prox = pd.DataFrame({
+        "AnoMes":  prox_labels,
+        "T":       [n_hist + 1, n_hist + 2, n_hist + 3],
+        "Mes_Fev": [1 if p.month == 2 else 0 for p in prox_meses],
+        "Mes_Jun": [1 if p.month == 6 else 0 for p in prox_meses],
+        "Mes_Nov": [1 if p.month == 11 else 0 for p in prox_meses],
+        "Mes_Dez": [1 if p.month == 12 else 0 for p in prox_meses],
     })
-    y_fut = modelo.predict(proximos[features].values)
+    yf = m.predict(prox[feats].values)
 
-    # Gráfico histórico + previsão
-    fig_prev = go.Figure()
-
-    fig_prev.add_trace(go.Scatter(
-        x=fat_serie["AnoMes"], y=fat_serie["Valor_Total"],
-        mode="lines+markers", name="Faturamento Real",
-        line=dict(color=CORES[0], width=2),
-        marker=dict(size=5),
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=fat_s["AnoMes"], y=fat_s["Valor_Total"],
+        mode="lines+markers", name="Histórico",
+        line=dict(color="#AAAAAA", width=1.5),
+        marker=dict(size=3, color="#AAAAAA"),
+        hovertemplate="<b>%{x}</b><br>R$ %{y:,.0f}<extra></extra>",
     ))
-    fig_prev.add_trace(go.Scatter(
-        x=fat_serie["AnoMes"], y=y_pred,
-        mode="lines", name="Modelo Ajustado",
-        line=dict(color=CORES[2], width=1.5, dash="dash"),
+    fig.add_trace(go.Scatter(
+        x=fat_s["AnoMes"], y=yp,
+        mode="lines", name="Modelo",
+        line=dict(color=COR_PRIMARIA, width=1.5, dash="dot"),
+        hovertemplate="<b>%{x}</b><br>R$ %{y:,.0f}<extra></extra>",
     ))
-
-    # Linha de previsão (conecta último ponto histórico com futuro)
-    x_prev = [fat_serie["AnoMes"].iloc[-1]] + list(proximos["AnoMes"])
-    y_prev = [y_pred[-1]] + list(y_fut)
-    fig_prev.add_trace(go.Scatter(
+    x_prev = [fat_s["AnoMes"].iloc[-1]] + list(prox["AnoMes"])
+    y_prev = [yp[-1]] + list(yf)
+    fig.add_trace(go.Scatter(
         x=x_prev, y=y_prev,
         mode="lines+markers", name="Previsão 2025",
-        line=dict(color=CORES[1], width=2.5),
-        marker=dict(size=8, symbol="square"),
+        line=dict(color=COR_HOVER, width=2.5),
+        marker=dict(size=7, symbol="circle", color=COR_HOVER),
+        hovertemplate="<b>%{x}</b><br>R$ %{y:,.0f}<extra></extra>",
     ))
-
-    # Faixa de incerteza
-    fig_prev.add_trace(go.Scatter(
-        x=list(proximos["AnoMes"]) + list(proximos["AnoMes"])[::-1],
-        y=list(y_fut + rmse) + list(y_fut - rmse)[::-1],
-        fill="toself", fillcolor="rgba(233,30,140,0.15)",
-        line=dict(color="rgba(255,255,255,0)"),
-        name=f"Intervalo ±R${rmse:,.0f}",
+    fig.add_trace(go.Scatter(
+        x=list(prox["AnoMes"]) + list(prox["AnoMes"])[::-1],
+        y=list(yf + rmse) + list(yf - rmse)[::-1],
+        fill="toself", fillcolor="rgba(192,57,43,0.12)",
+        line=dict(color="rgba(0,0,0,0)"),
+        name=f"Intervalo ±R$ {rmse:,.0f}",
+        hoverinfo="skip",
     ))
+    fig.update_layout(**layout_base(), title="Faturamento Histórico + Previsão",
+                      height=380, xaxis_tickangle=-40)
+    st.plotly_chart(fig, width="stretch")
 
-    fig_prev.add_vline(x=fat_serie["AnoMes"].iloc[-1], line_dash="dot", line_color="gray",
-                       annotation_text="  ← Histórico | Previsão →")
-
-    fig_prev.update_layout(
-        template="plotly_dark",
-        paper_bgcolor="#1a1a2e",
-        plot_bgcolor="#16213e",
-        title="Faturamento Histórico + Previsão Jan–Mar/2025",
-        xaxis_title="Mês",
-        yaxis_title="Receita (R$)",
-        height=460,
-        xaxis_tickangle=-45,
-    )
-    st.plotly_chart(fig_prev, use_container_width=True)
-
-    # Tabela de previsão
-    st.subheader("📋 Previsão Detalhada")
-    df_prev = pd.DataFrame({
-        "Mês": proximos["AnoMes"],
-        "Previsão": [f"R$ {v:,.2f}" for v in y_fut],
-        "Mínimo (−RMSE)": [f"R$ {v:,.2f}" for v in y_fut - rmse],
-        "Máximo (+RMSE)": [f"R$ {v:,.2f}" for v in y_fut + rmse],
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("#### Previsão detalhada")
+    df_pv = pd.DataFrame({
+        "Mês":              prox["AnoMes"],
+        "Previsão":         [f"R$ {v:,.2f}" for v in yf],
+        "Mínimo (−RMSE)":   [f"R$ {v:,.2f}" for v in yf - rmse],
+        "Máximo (+RMSE)":   [f"R$ {v:,.2f}" for v in yf + rmse],
     })
-    st.dataframe(df_prev, use_container_width=True, hide_index=True)
-
-    st.info(f"**Interpretação do R² = {r2:.3f}:** O modelo explica {r2*100:.1f}% da variação do faturamento. MAPE de {mape:.1f}% indica erro médio aceitável para planejamento comercial.")
+    st.dataframe(df_pv, hide_index=True, width="stretch")
+    st.caption(f"R² = {r2:.3f} · O modelo explica {r2*100:.1f}% da variação · MAPE {mape:.1f}%")
