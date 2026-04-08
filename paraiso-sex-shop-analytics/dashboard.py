@@ -101,32 +101,6 @@ def carregar():
 
 df, rfm = carregar()
 
-# ── Mapa do Brasil (cache global) ─────────────────────────────────────────────
-import json as _json, os as _os
-
-@st.cache_data(show_spinner=False)
-def get_geojson():
-    # tenta encontrar o arquivo em múltiplos locais possíveis
-    from pathlib import Path
-    candidatos = [
-        Path(__file__).parent / "dashboard" / "brazil-states.geojson",
-        Path.cwd() / "dashboard" / "brazil-states.geojson",
-        Path.cwd() / "brazil-states.geojson",
-    ]
-    for p in candidatos:
-        if p.exists():
-            with open(p, "r", encoding="utf-8") as f:
-                return _json.load(f)
-    raise FileNotFoundError(f"GeoJSON nao encontrado. Tentados: {candidatos}")
-
-ESTADO_REGIAO = {
-    "AC":"Norte","AM":"Norte","AP":"Norte","PA":"Norte","RO":"Norte","RR":"Norte","TO":"Norte",
-    "AL":"Nordeste","BA":"Nordeste","CE":"Nordeste","MA":"Nordeste","PB":"Nordeste",
-    "PE":"Nordeste","PI":"Nordeste","RN":"Nordeste","SE":"Nordeste",
-    "DF":"Centro-Oeste","GO":"Centro-Oeste","MS":"Centro-Oeste","MT":"Centro-Oeste",
-    "ES":"Sudeste","MG":"Sudeste","RJ":"Sudeste","SP":"Sudeste",
-    "PR":"Sul","RS":"Sul","SC":"Sul",
-}
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 
@@ -217,25 +191,6 @@ if pagina == "Visão Geral":
     c4.metric("Clientes Únicos", f"{df_f['ID_Cliente'].nunique():,}")
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    # Faturamento mensal
-    fat = df_f.groupby("AnoMes")["Valor_Total"].sum().reset_index().sort_values("AnoMes")
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=fat["AnoMes"], y=fat["Valor_Total"],
-        mode="lines+markers",
-        line=dict(color=COR_PRIMARIA, width=2),
-        marker=dict(size=4, color=COR_PRIMARIA),
-        fill="tozeroy",
-        fillcolor=f"rgba(192,57,43,0.08)",
-        name="Faturamento",
-        hovertemplate="<b>%{x}</b><br>R$ %{y:,.0f}<extra></extra>",
-    ))
-    fig.update_layout(**layout_base(), title="Faturamento Mensal", height=300,
-                      xaxis_tickangle=-40)
-    st.plotly_chart(fig, width="stretch")
-
-    st.markdown("<br>", unsafe_allow_html=True)
     col_a, col_b = st.columns(2)
 
     with col_a:
@@ -263,45 +218,19 @@ if pagina == "Visão Geral":
         fig3.update_layout(**lo, title="Método de Pagamento", height=300, showlegend=True)
         st.plotly_chart(fig3, width="stretch")
 
-    # ── Mapa de Calor — 5 Regiões do Brasil ──────────────────────────────────
+    # Receita por Região
     st.markdown("<br>", unsafe_allow_html=True)
-    receita_regiao = df_f.groupby("Regiao")["Valor_Total"].sum().to_dict()
-    df_estados = pd.DataFrame([
-        {"Estado": uf, "Regiao": reg,
-         "Receita": receita_regiao.get(reg, 0),
-         "Receita_fmt": f"R$ {receita_regiao.get(reg, 0):,.0f}"}
-        for uf, reg in ESTADO_REGIAO.items()
-    ])
+    reg = df_f.groupby("Regiao")["Valor_Total"].sum().reset_index().sort_values("Valor_Total", ascending=True)
+    fig_reg = go.Figure(go.Bar(
+        x=reg["Valor_Total"], y=reg["Regiao"],
+        orientation="h",
+        marker=dict(color=COR_PRIMARIA, opacity=0.85),
+        hovertemplate="<b>%{y}</b><br>R$ %{x:,.0f}<extra></extra>",
+    ))
+    fig_reg.update_layout(**layout_base(), title="Receita por Região", height=280)
+    fig_reg.update_xaxes(showticklabels=False)
+    st.plotly_chart(fig_reg, width="stretch")
 
-    try:
-        geojson = get_geojson()
-        fig_mapa = px.choropleth(
-            df_estados,
-            geojson=geojson,
-            locations="Estado",
-            featureidkey="properties.sigla",
-            color="Receita",
-            color_continuous_scale=["#FFF0F0", "#F1948A", COR_PRIMARIA, "#7B241C"],
-            custom_data=["Regiao", "Receita_fmt"],
-            title="Receita por Região do Brasil",
-        )
-        fig_mapa.update_traces(
-            hovertemplate="<b>%{customdata[0]}</b><br>%{customdata[1]}<extra></extra>"
-        )
-        fig_mapa.update_geos(fitbounds="locations", visible=False, bgcolor="rgba(0,0,0,0)")
-        fig_mapa.update_layout(
-            **layout_base(),
-            height=520,
-            margin=dict(l=0, r=0, t=40, b=0),
-            coloraxis_colorbar=dict(
-                title="Receita (R$)",
-                tickformat=",.0f",
-                len=0.7, thickness=14,
-            ),
-        )
-        st.plotly_chart(fig_mapa, width="stretch")
-    except Exception as _e:
-        st.error(f"Erro no mapa: {_e}")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # CLIENTES
