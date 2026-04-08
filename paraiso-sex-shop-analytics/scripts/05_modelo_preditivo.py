@@ -158,18 +158,23 @@ for feat, coef in zip(features, modelo.coef_):
 
 # ── PASSO 5: Previsão dos próximos 3 meses ───────────────────────────────────
 
-print("\n[5/5] Prevendo faturamento para Jan-Mar/2025...")
+# Calcula dinamicamente os 3 meses seguintes ao último mês do histórico
+ultimo_periodo = pd.Period(fat_mensal["AnoMes"].max(), freq="M")
+prox_periodos  = [ultimo_periodo + i for i in range(1, 4)]
+n_hist         = len(fat_mensal)
 
-# Cria os dados dos próximos 3 meses
 proximos_meses = pd.DataFrame({
-    "AnoMes":   ["2025-01", "2025-02", "2025-03"],
-    "T":        [25, 26, 27],                   # continua a sequência 1..24..25..26..27
-    "Mes_Num":  [1, 2, 3],
-    "Mes_Fev":  [0, 1, 0],
-    "Mes_Jun":  [0, 0, 0],
-    "Mes_Nov":  [0, 0, 0],
-    "Mes_Dez":  [0, 0, 0],
+    "AnoMes":  [str(p) for p in prox_periodos],
+    "T":       [n_hist + i for i in range(1, 4)],
+    "Mes_Num": [p.month for p in prox_periodos],
+    "Mes_Fev": [1 if p.month == 2  else 0 for p in prox_periodos],
+    "Mes_Jun": [1 if p.month == 6  else 0 for p in prox_periodos],
+    "Mes_Nov": [1 if p.month == 11 else 0 for p in prox_periodos],
+    "Mes_Dez": [1 if p.month == 12 else 0 for p in prox_periodos],
 })
+
+label_meses = f"{proximos_meses['AnoMes'].iloc[0]} a {proximos_meses['AnoMes'].iloc[-1]}"
+print(f"\n[5/5] Prevendo faturamento para {label_meses}...")
 
 X_futuro = proximos_meses[features].values
 y_futuro = modelo.predict(X_futuro)
@@ -246,8 +251,9 @@ df_previsao["Previsao_Faturamento"] = y_futuro.round(2)
 df_previsao["Intervalo_RMSE"]       = round(intervalo, 2)
 df_previsao["Limite_Inferior"]      = (y_futuro - intervalo).round(2)
 df_previsao["Limite_Superior"]      = (y_futuro + intervalo).round(2)
-df_previsao.to_csv("data/previsao_2025.csv", index=False, encoding="utf-8-sig")
-print("  ✔ Previsão salva: data/previsao_2025.csv")
+nome_csv = f"data/previsao_{proximos_meses['AnoMes'].iloc[0][:4]}.csv"
+df_previsao.to_csv(nome_csv, index=False, encoding="utf-8-sig")
+print(f"  ✔ Previsão salva: {nome_csv}")
 
 # ── Resumo final ─────────────────────────────────────────────────────────────
 
@@ -259,5 +265,5 @@ print(f"\n  Previsão para os próximos 3 meses:")
 for mes, prev in zip(proximos_meses["AnoMes"], y_futuro):
     print(f"    {mes}: R$ {prev:,.2f}")
 print(f"\n  Todos os scripts foram executados com sucesso!")
-print(f"  Agora abra o Power BI Desktop e importe data/ecom_data_clean.csv")
+print(f"  Agora rode: streamlit run dashboard.py")
 print(f"{'=' * 65}\n")

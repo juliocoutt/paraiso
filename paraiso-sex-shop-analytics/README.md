@@ -6,7 +6,7 @@
 
 ## Sobre o Projeto
 
-Este projeto simula a atuação de um analista de dados na empresa fictícia **Paraiso Sex Shop**, um e-commerce adulto do mercado brasileiro. A missão é responder perguntas estratégicas de negócio a partir de um dataset de 5.500 transações cobrindo o período de **janeiro de 2023 a dezembro de 2024**.
+Este projeto simula a atuação de um analista de dados na empresa fictícia **Paraiso Sex Shop**, um e-commerce adulto do mercado brasileiro. A missão é responder perguntas estratégicas de negócio a partir de um dataset de **30.000 transações** cobrindo o período de **janeiro de 2015 a dezembro de 2026**.
 
 **Perguntas de negócio respondidas:**
 - Qual o perfil de consumo e segmentação dos clientes?
@@ -24,12 +24,13 @@ O mercado de produtos íntimos no Brasil apresenta características analíticas 
 
 | Ferramenta | Uso |
 |---|---|
-| Python 3.11+ | ETL, EDA, modelo preditivo |
+| Python 3.10+ | ETL, EDA, modelo preditivo |
 | pandas | manipulação e análise de dados |
 | scikit-learn | Regressão Linear |
-| matplotlib / seaborn | visualizações |
+| matplotlib / seaborn | visualizações estáticas |
+| plotly | gráficos interativos no dashboard |
+| Streamlit | dashboard web interativo |
 | SQLite | banco de dados relacional |
-| Power BI Desktop | dashboard interativo |
 | GitHub | versionamento e entrega |
 
 ---
@@ -38,36 +39,30 @@ O mercado de produtos íntimos no Brasil apresenta características analíticas 
 
 ```
 paraiso-sex-shop-analytics/
+├── .streamlit/
+│   └── config.toml                # tema do dashboard (vermelho/branco)
 ├── data/
-│   ├── ecom_data.csv              # dataset bruto gerado (5.500+ linhas)
-│   ├── ecom_data_clean.csv        # dataset limpo (pós ETL)
+│   ├── ecom_data.csv              # dataset bruto gerado (30.050 linhas)
+│   ├── ecom_data_clean.csv        # dataset limpo (pós ETL, 26.913 linhas)
 │   ├── ecom_data_completo.csv     # dataset completo com todos os status
 │   ├── rfm_clientes.csv           # segmentação RFM dos clientes
-│   ├── previsao_2025.csv          # previsão Jan-Mar/2025
+│   ├── previsao_2027.csv          # previsão dos próximos 3 meses
 │   ├── query1_faturamento_mensal.csv
 │   ├── query3_ranking_categorias.csv
 │   ├── query4_retencao_mensal.csv
 │   ├── query6_media_movel.csv
 │   └── graficos/                  # 9 gráficos exportados em PNG
-│       ├── 01_receita_por_categoria.png
-│       ├── 02_top10_produtos.png
-│       ├── 03_faturamento_mensal.png
-│       ├── 04_perfil_clientes.png
-│       ├── 05_outliers_boxplot.png
-│       ├── 06_correlacao_desconto.png
-│       ├── 07_segmentacao_rfm.png
-│       ├── 08_receita_por_regiao.png
-│       └── 09_previsao_faturamento.png
 ├── database/
 │   └── paraiso_db.sqlite          # banco SQLite com tabelas vendas e vendas_canceladas
+├── dashboard/
+│   └── logo.png                   # logo do dashboard
 ├── scripts/
 │   ├── 01_gerar_dados.py          # Sprint 1: gera o CSV simulado
 │   ├── 02_etl.py                  # Sprint 1: limpa os dados e carrega no SQLite
 │   ├── 03_eda.py                  # Sprint 2: análise exploratória + gráficos
 │   ├── 04_sql_queries.py          # Sprint 2: 6 queries SQL complexas
 │   └── 05_modelo_preditivo.py     # Sprint 4: regressão linear + previsão
-├── dashboard/
-│   └── paraiso_dashboard.pbix     # dashboard Power BI (3 páginas)
+├── dashboard.py                   # app Streamlit (dashboard interativo)
 ├── requirements.txt
 └── README.md
 ```
@@ -79,7 +74,6 @@ paraiso-sex-shop-analytics/
 ### Pré-requisitos
 - Python 3.10 ou superior ([download](https://python.org))
 - VS Code ([download](https://code.visualstudio.com))
-- Power BI Desktop ([download gratuito](https://powerbi.microsoft.com/pt-br/desktop/))
 
 ### Passo a passo
 
@@ -94,27 +88,28 @@ cd paraiso-sex-shop-analytics
 # Windows
 python -m venv venv
 venv\Scripts\activate
-
-# Você verá (venv) no início do terminal — sinal de que está ativo
 ```
 
 **3. Instale as dependências**
 ```bash
 pip install -r requirements.txt
+pip install streamlit plotly
 ```
 
 **4. Execute os scripts na ordem**
 ```bash
-python scripts/01_gerar_dados.py     # gera data/ecom_data.csv
-python scripts/02_etl.py             # limpa e carrega no SQLite
-python scripts/03_eda.py             # análise exploratória + gráficos
-python scripts/04_sql_queries.py     # queries SQL no terminal
+python scripts/01_gerar_dados.py      # gera data/ecom_data.csv
+python scripts/02_etl.py              # limpa e carrega no SQLite
+python scripts/03_eda.py              # análise exploratória + gráficos
+python scripts/04_sql_queries.py      # queries SQL no terminal
 python scripts/05_modelo_preditivo.py # regressão linear + previsão
 ```
 
-**5. Abra o Power BI**
-- Abra `dashboard/paraiso_dashboard.pbix`
-- Se necessário, atualize a fonte de dados para o caminho local de `data/ecom_data_clean.csv`
+**5. Abra o dashboard**
+```bash
+streamlit run dashboard.py
+```
+Acesse em: http://localhost:8501
 
 ---
 
@@ -122,13 +117,13 @@ python scripts/05_modelo_preditivo.py # regressão linear + previsão
 
 ### Dataset Gerado
 
-O arquivo `data/ecom_data.csv` contém **5.500 transações simuladas** com as seguintes características:
+O arquivo `data/ecom_data.csv` contém **30.000 transações simuladas** com as seguintes características:
 
 | Coluna | Tipo | Descrição |
 |---|---|---|
 | ID_Transacao | int | Chave única da transação |
-| Data_Venda | date | Jan/2023 – Dez/2024 |
-| ID_Cliente | int | 800 clientes únicos (gera recorrência) |
+| Data_Venda | date | Jan/2015 – Dez/2026 |
+| ID_Cliente | int | 3.000 clientes únicos (gera recorrência) |
 | Nome_Cliente | str | Nome fictício gerado com Faker BR |
 | Genero_Cliente | str | F (58%), M (38%), Não informado (4%) |
 | Faixa_Etaria | str | 18-25, 26-35, 36-45, 46+ |
@@ -166,7 +161,7 @@ O arquivo `data/ecom_data.csv` contém **5.500 transações simuladas** com as s
 **Perfil de Clientes:**
 - Público majoritariamente feminino (58% da receita) na faixa de 26–35 anos.
 - Região Sudeste domina com ~43% da receita, alinhado com a distribuição populacional do Brasil.
-- Ticket médio por pedido: ~R$ 150–R$ 200 (varia conforme categoria).
+- Ticket médio por pedido: ~R$ 242 (varia conforme categoria e desconto aplicado).
 
 **Segmentação RFM:**
 | Segmento | Perfil | Ação Recomendada |
@@ -190,32 +185,33 @@ O arquivo `data/ecom_data.csv` contém **5.500 transações simuladas** com as s
 
 ---
 
-## Sprint 3: Dashboard Power BI
+## Sprint 3: Dashboard Streamlit
 
-### Como Reproduzir o Dashboard
+O dashboard interativo foi construído com **Streamlit + Plotly** e possui 4 páginas:
 
-1. Abra o Power BI Desktop
-2. Clique em **Obter Dados → Texto/CSV**
-3. Selecione o arquivo `data/ecom_data_clean.csv`
-4. Clique em **Transformar Dados** → revise os tipos de coluna → **Fechar e Aplicar**
+**Visão Geral**
+- 4 KPIs: Faturamento Total | Ticket Médio | Pedidos | Clientes Únicos
+- Receita por Categoria (barras horizontais)
+- Método de Pagamento (gráfico de rosca)
+- Receita por Região (barras horizontais)
 
-### Estrutura do Dashboard (3 páginas)
+**Clientes**
+- KPIs: Clientes Únicos | Pedidos por Cliente | LTV Médio
+- Receita por Faixa Etária
+- Split por Gênero (rosca)
+- Tabela de Segmentos RFM
+- Receita por Região
 
-**Página 1 — Visão Geral**
-- 4 Cards: Faturamento Total | Ticket Médio | Total de Pedidos | Clientes Únicos
-- Gráfico de linhas: Faturamento por Mês
-- Segmentações (filtros): Ano, Região, Categoria
+**Produtos**
+- Top 10 Produtos mais vendidos
+- Receita por Categoria
+- Dispersão: Desconto × Valor Total
 
-**Página 2 — Clientes**
-- Gráfico de barras: Receita por Faixa Etária
-- Gráfico de pizza: Split por Gênero
-- Gráfico de barras: Receita por Região
-- Tabela: Segmentos RFM (importar `data/rfm_clientes.csv`)
+**Previsão**
+- Gráfico histórico + linha de previsão dos próximos 3 meses
+- Tabela com valores previstos e intervalo de confiança (±RMSE)
 
-**Página 3 — Produtos**
-- Gráfico de barras horizontal: Top 10 Produtos
-- Treemap: Receita por Categoria
-- Gráfico de dispersão: Desconto × Valor Total
+**Filtros globais (sidebar):** Ano, Mês, Região, Categoria
 
 ---
 
@@ -223,41 +219,31 @@ O arquivo `data/ecom_data.csv` contém **5.500 transações simuladas** com as s
 
 ### Metodologia
 
-**Objetivo:** Prever o faturamento mensal de janeiro a março de 2025.
+**Objetivo:** Prever o faturamento mensal dos 3 meses seguintes ao último mês do histórico.
 
 **Algoritmo:** Regressão Linear Múltipla (`sklearn.linear_model.LinearRegression`)
 
 **Variáveis de entrada (features):**
-- `T` — índice temporal (1 a 24), captura a tendência geral de crescimento
+- `T` — índice temporal, captura a tendência geral de crescimento
 - `Mes_Fev` — dummy para Fevereiro (Carnaval + Dia dos Namorados BR)
 - `Mes_Jun` — dummy para Junho (Dia dos Namorados tradicional)
 - `Mes_Nov` — dummy para Novembro (Black Friday)
 - `Mes_Dez` — dummy para Dezembro (Natal)
 
 **Por que Regressão Linear?**  
-Com apenas 24 pontos de dados mensais, modelos mais complexos (como ARIMA ou redes neurais) tendem a superajustar. A Regressão Linear oferece:
+Com uma série temporal longa mas com padrão sazonal bem definido, a Regressão Linear com variáveis dummy de sazonalidade oferece:
 - Interpretabilidade dos coeficientes
-- Robustez com poucos dados
-- Facilidade de comunicação para stakeholders
+- Robustez e facilidade de comunicação para stakeholders
+- Boa captura da tendência + sazonalidade com poucos parâmetros
 
 ### Métricas de Avaliação
 
-| Métrica | Descrição | Resultado esperado |
-|---|---|---|
-| **R²** | % da variação explicada pelo modelo | > 0.60 (bom para séries curtas) |
-| **MAE** | Erro médio absoluto (em R$) | Referência: < 10% do faturamento médio |
-| **RMSE** | Penaliza erros grandes | Usado como intervalo de confiança |
-| **MAPE** | Erro percentual médio | < 15% = aceitável para planejamento |
-
-### Previsão Jan–Mar/2025
-
-| Mês | Previsão | Intervalo (±RMSE) |
-|---|---|---|
-| 2025-01 | *executar o script* | *executar o script* |
-| 2025-02 | *executar o script* | *executar o script* |
-| 2025-03 | *executar o script* | *executar o script* |
-
-> Execute `python scripts/05_modelo_preditivo.py` para ver os valores reais gerados com os seus dados.
+| Métrica | Descrição |
+|---|---|
+| **R²** | % da variação explicada pelo modelo |
+| **MAE** | Erro médio absoluto em R$ |
+| **RMSE** | Raiz do erro quadrático médio — usado como intervalo de confiança |
+| **MAPE** | Erro percentual médio |
 
 ---
 
@@ -266,7 +252,7 @@ Com apenas 24 pontos de dados mensais, modelos mais complexos (como ARIMA ou red
 Com base nas análises realizadas, as **5 recomendações principais** para o time comercial da Paraiso Sex Shop são:
 
 **1. Concentrar estoque e campanhas em Fevereiro e Junho**  
-Os picos de faturamento em Fevereiro (Carnaval + Dia dos Namorados BR) e Junho (Dia dos Namorados tradicional) são consistentes. Antecipar compras de estoque 45 dias antes reduz risco de ruptura nos itens de maior giro (Lubrificantes e Lingerie).
+Os picos de faturamento em Fevereiro (Carnaval + Dia dos Namorados BR) e Junho (Dia dos Namorados tradicional) são consistentes ao longo dos anos. Antecipar compras de estoque 45 dias antes reduz risco de ruptura nos itens de maior giro (Lubrificantes e Lingerie).
 
 **2. Estratégia de Cross-Sell entre Vibradores e Lubrificantes**  
 Vibradores têm o maior ticket médio mas menor volume; Lubrificantes têm o maior volume mas menor ticket. Um kit combinado com desconto progressivo aumenta o ticket médio sem reduzir margem.
@@ -275,7 +261,7 @@ Vibradores têm o maior ticket médio mas menor volume; Lubrificantes têm o mai
 O segmento RFM "At Risk" representa clientes que já gastaram bem mas estão inativos. Uma campanha de e-mail personalizada com desconto de 15-20% pode recuperar 20-30% desse segmento a custo menor que a aquisição de novos clientes.
 
 **4. Expandir presença no Nordeste**  
-Apesar de representar 20% da população brasileira, o Nordeste contribui com cerca de 20% da receita — mesma proporção. Há espaço para crescimento com campanhas regionalizadas e parcerias com marketplaces locais.
+O Nordeste contribui com ~20% da receita, alinhado à sua participação populacional. Há espaço para crescimento acima da média com campanhas regionalizadas e parcerias com marketplaces locais.
 
 **5. Investir no canal App**  
 O App representa 30% das vendas e tende a ter maior fidelização que site e marketplace. Melhorias de UX e notificações push em datas comemorativas podem aumentar o share do canal com maior LTV.
