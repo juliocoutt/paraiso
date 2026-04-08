@@ -271,12 +271,16 @@ O App representa 30% das vendas e tende a ter maior fidelização que site e mar
 ## Autor
 
 **Julio Couto**  
-Engenheiro de Produção | Pós-Graduação em Gestão de Projetos  
-5 anos de experiência em Marketplaces e E-Commerce
+Engenheiro de Produção | Pós-Graduação em Gestão de Projetos
+Graduando em Engenharia de Sofware 
+Graduando em Ciência e Tecnologia 
+Pós-Graduando em Engenharia de Segurança do Trabalho
+Pós-Graduando em Ciência de Dados 
+Especialista em Implantação de Projetos de Marketplaces e E-Commerce
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-blue)](https://www.linkedin.com/in/julioccouto/)
-[![GitHub](https://img.shields.io/badge/GitHub-black)](https://github.com/SEU_USUARIO)
+
 
 ---
 
-*Projeto desenvolvido como parte do programa de formação InsightFlow — Ciclo de Análise de Dados.*
+*Projeto desenvolvido como parte do programa de formação Projeto Desenvolve.*
