@@ -1,0 +1,24 @@
+# Ambiente virtual Python — nunca sobe para o GitHub
+venv/
+.venv/
+env/
+
+# Cache do Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Cache do Streamlit
+.streamlit/cache/
+
+# Arquivos brutos / grandes (podem ser regenerados pelos scripts)
+data/ecom_data.csv
+data/ecom_data_completo.csv
+
+# Configurações de editores
+.vscode/
+.idea/
+*.DS_Store
+
+# Logs
+*.log

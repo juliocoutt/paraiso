@@ -1,6 +1,26 @@
+# ─────────────────────────────────────────────────────────────
+# PARAISO SEX SHOP — Dependências do Projeto
+# ─────────────────────────────────────────────────────────────
+# Como instalar:
+#   pip install -r requirements.txt
+# ─────────────────────────────────────────────────────────────
+
+# Dados e análise
 pandas>=2.2
 numpy>=1.26
+
+# Geração de dados fictícios (script 01)
+Faker>=24.0
+
+# Visualizações estáticas (scripts 03 e 05)
 matplotlib>=3.8
 seaborn>=0.13
+
+# Machine Learning (script 05)
 scikit-learn>=1.4
-Faker>=24.0
+
+# Gráficos interativos (dashboard)
+plotly>=5.18
+
+# Dashboard web
+streamlit>=1.32
