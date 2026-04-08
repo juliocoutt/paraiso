@@ -271,11 +271,11 @@ O App representa 30% das vendas e tende a ter maior fidelização que site e mar
 ## Autor
 
 **Julio Couto**  
-Engenheiro de Produção | Pós-Graduação em Gestão de Projetos
-Graduando em Engenharia de Sofware 
-Graduando em Ciência e Tecnologia 
-Pós-Graduando em Engenharia de Segurança do Trabalho
-Pós-Graduando em Ciência de Dados 
+Engenheiro de Produção | Pós-Graduação em Gestão de Projetos |
+Graduando em Engenharia de Sofware |
+Graduando em Ciência e Tecnologia |
+Pós-Graduando em Engenharia de Segurança do Trabalho |
+Pós-Graduando em Ciência de Dados |
 Especialista em Implantação de Projetos de Marketplaces e E-Commerce
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-blue)](https://www.linkedin.com/in/julioccouto/)
