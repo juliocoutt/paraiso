@@ -62,7 +62,17 @@ paraiso-sex-shop-analytics/
 │   ├── 03_eda.py                  # Sprint 2: análise exploratória + gráficos
 │   ├── 04_sql_queries.py          # Sprint 2: 6 queries SQL complexas
 │   └── 05_modelo_preditivo.py     # Sprint 4: regressão linear + previsão
-├── dashboard.py                   # app Streamlit (dashboard interativo)
+├── utils/
+│   ├── config.py                  # cores, CSS e layout padrão dos gráficos
+│   └── data.py                    # carregamento e cache dos CSVs
+├── components/
+│   └── sidebar.py                 # sidebar com logo, filtros e navegação
+├── views/                         # cada página do dashboard em arquivo separado
+│   ├── visao_geral.py             # página: KPIs, categorias, pagamentos, regiões
+│   ├── clientes.py                # página: perfil, RFM, faixa etária, gênero
+│   ├── produtos.py                # página: top 10, treemap, dispersão desconto
+│   └── previsao.py                # página: regressão linear + gráfico + tabela
+├── dashboard.py                   # ponto de entrada — inicializa e roteia as páginas
 ├── requirements.txt
 └── README.md
 ```
@@ -187,27 +197,36 @@ O arquivo `data/ecom_data.csv` contém **30.000 transações simuladas** com as 
 
 ## Sprint 3: Dashboard Streamlit
 
-O dashboard interativo foi construído com **Streamlit + Plotly** e possui 4 páginas:
+O dashboard interativo foi construído com **Streamlit + Plotly** e possui código modular dividido em camadas:
 
-**Visão Geral**
+| Camada | Arquivo | Responsabilidade |
+| --- | --- | --- |
+| Entrada | `dashboard.py` | Configura a página, carrega dados e roteia para a view correta |
+| Configuração | `utils/config.py` | Paleta de cores, CSS global e layout padrão dos gráficos |
+| Dados | `utils/data.py` | Leitura dos CSVs com cache (`@st.cache_data`) |
+| Navegação | `components/sidebar.py` | Logo, filtros globais e menu de páginas |
+| Views | `views/*.py` | Uma função `show()` por página, isolada e independente |
+
+**Visão Geral** (`views/visao_geral.py`)
 - 4 KPIs: Faturamento Total | Ticket Médio | Pedidos | Clientes Únicos
 - Receita por Categoria (barras horizontais)
 - Método de Pagamento (gráfico de rosca)
 - Receita por Região (barras horizontais)
 
-**Clientes**
+**Clientes** (`views/clientes.py`)
 - KPIs: Clientes Únicos | Pedidos por Cliente | LTV Médio
 - Receita por Faixa Etária
 - Split por Gênero (rosca)
-- Tabela de Segmentos RFM
+- Segmentação RFM com ações recomendadas
 - Receita por Região
 
-**Produtos**
-- Top 10 Produtos mais vendidos
-- Receita por Categoria
+**Produtos** (`views/produtos.py`)
+
+- Top 10 Produtos por Receita
+- Treemap: Categoria → Produto
 - Dispersão: Desconto × Valor Total
 
-**Previsão**
+**Previsão** (`views/previsao.py`)
 - Gráfico histórico + linha de previsão dos próximos 3 meses
 - Tabela com valores previstos e intervalo de confiança (±RMSE)
 
